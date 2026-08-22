@@ -1,0 +1,16 @@
+{
+  "name": "aura-live-voice-todo",
+  "version": "1.0.0",
+  "description": "Aura Live Voice & Smart To-Do - Android App",
+  "scripts": {
+    "sync": "cap sync android",
+    "build": "cd android && ./gradlew assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/core": "^6.1.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.2"
+  }
+}

@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#07090e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Live Voice AI Assistant for Android with Barge-in support, voice and manual To-Do list, and smart notes.">
+  <title>My Maya Live Voice & Smart To-Do</title>
+
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="app-container">
+
+  <!-- ================= App Header ================= -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-icon">⚡</div>
+      <div class="brand-info">
+        <h1>My Maya</h1>
+        <span class="brand-sub">Live AI & Smart To-Do</span>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <div id="statusBadge" class="status-badge">
+        <span class="dot"></span>
+        <span id="statusText">Ready</span>
+      </div>
+      <button id="quickKeyBtn" class="icon-btn" title="API Key Settings">🔑</button>
+    </div>
+  </header>
+
+  <!-- ================= Main Content Views ================= -->
+  <main class="main-content">
+
+    <!-- 1. LIVE VOICE TAB -->
+    <section id="view-live" class="tab-view active">
+      <div class="live-hero">
+        <div class="barge-in-badge">
+          <span>⚡</span>
+          <span>Barge-in Supported &bull; Interrupt Anytime</span>
+        </div>
+
+        <!-- Dynamic 3D Voice Orb Canvas -->
+        <div class="visualizer-wrapper">
+          <canvas id="voiceOrbCanvas"></canvas>
+        </div>
+
+        <!-- Live Transcripts / Captions -->
+        <div class="live-caption-box">
+          <p id="liveCaption" class="caption-text placeholder">Tap the microphone to start live conversation...</p>
+        </div>
+
+        <!-- Live Controls -->
+        <div class="live-controls">
+          <button id="muteMicBtn" class="control-btn-secondary" title="Mute Microphone">🎙️</button>
+          <button id="toggleLiveBtn" class="mic-btn-main" title="Start Live Voice">
+            <span id="liveBtnIcon">⚡</span>
+          </button>
+          <button id="clearChatBtn" class="control-btn-secondary" title="Clear Transcript">🧹</button>
+        </div>
+
+        <!-- Voice Command Suggestions -->
+        <div class="suggestions-section">
+          <div class="section-label">Try Saying or Tapping</div>
+          <div class="chip-scroll">
+            <button class="suggest-chip" data-prompt="Add buy groceries and fresh fruits to my to-do list with high priority">
+              <span class="chip-icon">🛒</span>
+              <span>"Add buy groceries to my to-do list"</span>
+            </button>
+            <button class="suggest-chip" data-prompt="What are my tasks for today?">
+              <span class="chip-icon">📅</span>
+              <span>"What are my tasks for today?"</span>
+            </button>
+            <button class="suggest-chip" data-prompt="Write down a note: Meeting summary with client discussing new project roadmap">
+              <span class="chip-icon">💡</span>
+              <span>"Write down a note: Project roadmap idea"</span>
+            </button>
+            <button class="suggest-chip" data-prompt="Mark my task as completed">
+              <span class="chip-icon">✅</span>
+              <span>"Mark task as completed"</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Connection Diagnostics Panel -->
+        <div class="diagnostics-panel">
+          <details open>
+            <summary class="diagnostics-summary">🛠️ View Connection Diagnostics</summary>
+            <div id="diagnosticsLog" class="diagnostics-log">[System Initialized] Ready.</div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. TO-DO LIST TAB -->
+    <section id="view-todo" class="tab-view">
+      <div class="view-header">
+        <div class="view-title">Schedule</div>
+        <div id="todoCountBadge" class="stats-badge">0 tasks</div>
+      </div>
+
+      <!-- Segmented Tab Switcher -->
+      <div class="segmented-control">
+        <button id="showTasksBtn" class="segment-btn active">Tasks</button>
+        <button id="showAlarmsBtn" class="segment-btn">Alarms</button>
+      </div>
+
+      <!-- 2A. TASKS SUB-VIEW -->
+      <div id="tasksSubView" class="sub-view-content active">
+        <div class="search-bar">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="todoSearchInput" class="search-input" placeholder="Search tasks or categories...">
+        </div>
+
+        <!-- Category Filter Pills -->
+        <div class="filter-scroll" id="todoFilterContainer">
+          <div class="filter-pill active" data-category="all">All</div>
+          <div class="filter-pill" data-category="today">Today</div>
+          <div class="filter-pill" data-category="Personal">Personal</div>
+          <div class="filter-pill" data-category="Work">Work</div>
+          <div class="filter-pill" data-category="Shopping">Shopping</div>
+          <div class="filter-pill" data-category="Urgent">Urgent</div>
+          <div class="filter-pill" data-category="completed">Completed</div>
+        </div>
+
+        <!-- Task List Items -->
+        <div id="taskListContainer" class="task-list">
+          <!-- Injected via JavaScript -->
+        </div>
+      </div>
+
+      <!-- 2B. ALARMS SUB-VIEW -->
+      <div id="alarmsSubView" class="sub-view-content" style="display: none;">
+        <div class="alarms-header-action">
+          <p class="settings-desc" style="margin-bottom: 0;">Set recurring or one-time alarms. Gemini can also manage them!</p>
+          <button id="newAlarmBtn" class="filter-pill active" style="margin-top: 0; font-size: 11px;">+ Add Alarm</button>
+        </div>
+        <div id="alarmsListContainer" class="alarms-list">
+          <!-- Injected via JavaScript -->
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. NOTES / MEMO TAB -->
+    <section id="view-notes" class="tab-view">
+      <div class="view-header">
+        <div class="view-title">Notes & Memos</div>
+        <button id="newNoteBtn" class="filter-pill active">+ New Note</button>
+      </div>
+
+      <div class="search-bar">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="noteSearchInput" class="search-input" placeholder="Search notes...">
+      </div>
+
+      <div id="notesListContainer" class="notes-grid">
+        <!-- Injected via JavaScript -->
+      </div>
+    </section>
+
+    <!-- 4. CHAT / TRANSCRIPT HISTORY TAB -->
+    <section id="view-chat" class="tab-view">
+      <div class="view-header">
+        <div class="view-title">Live Transcript</div>
+      </div>
+
+      <div id="chatThread" class="chat-thread">
+        <div class="chat-bubble assistant">
+          Hello! I'm My Maya, your live AI assistant with barge-in support. You can talk to me live, or type your requests below.
+        </div>
+      </div>
+
+      <div class="chat-input-bar">
+        <input type="text" id="chatTextInput" class="chat-input" placeholder="Type a message or task command...">
+        <button id="chatSendBtn" class="chat-send-btn" title="Send message">➔</button>
+      </div>
+    </section>
+
+    <!-- 5. SETTINGS TAB -->
+    <section id="view-settings" class="tab-view">
+      <div class="view-header">
+        <div class="view-title">Settings</div>
+      </div>
+
+      <!-- API Key Card -->
+      <div class="settings-section">
+        <h3>🔑 Gemini API Key</h3>
+        <p class="settings-desc">Enter your Google Gemini API key to enable live audio streaming and voice actions.</p>
+        
+        <div class="form-group">
+          <label class="form-label">API Key</label>
+          <div class="input-with-action">
+            <input type="password" id="apiKeyInput" class="form-input" placeholder="AIzaSy...">
+            <button id="toggleKeyVisibility" class="input-action-btn" type="button">👁️</button>
+          </div>
+        </div>
+
+        <button id="saveApiKeyBtn" class="btn-primary">Save API Key</button>
+        <button id="testApiKeyBtn" class="btn-secondary">Test Connection</button>
+      </div>
+
+      <!-- Voice & Model Settings -->
+      <div class="settings-section">
+        <h3>🎙️ Live Voice & Persona</h3>
+        <p class="settings-desc">Choose the model and voice personality for real-time live responses.</p>
+
+        <div class="form-group">
+          <label class="form-label">Gemini AI Model</label>
+          <select id="modelSelect" class="form-select">
+            <option value="models/gemini-2.0-flash-realtime-exp">Gemini 2.0 Flash Realtime Exp</option>
+            <option value="models/gemini-2.0-flash-exp">Gemini 2.0 Flash Exp (Legacy)</option>
+            <option value="models/gemini-2.5-flash">Gemini 2.5 Flash</option>
+            <option value="models/gemini-3.1-flash-live-preview">Gemini 3.1 Live Preview</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Voice Selection</label>
+          <div class="voice-grid" id="voiceSelector">
+            <div class="voice-option selected" data-voice="Aoede">
+              <div class="voice-name">Aoede</div>
+              <div class="voice-tone">Breezy & Natural</div>
+            </div>
+            <div class="voice-option" data-voice="Sulafat">
+              <div class="voice-name">Sulafat</div>
+              <div class="voice-tone">Warm & Expressive</div>
+            </div>
+            <div class="voice-option" data-voice="Puck">
+              <div class="voice-name">Puck</div>
+              <div class="voice-tone">Playful & Upbeat</div>
+            </div>
+            <div class="voice-option" data-voice="Charon">
+              <div class="voice-name">Charon</div>
+              <div class="voice-tone">Calm & Deep</div>
+            </div>
+            <div class="voice-option" data-voice="Fenrir">
+              <div class="voice-name">Fenrir</div>
+              <div class="voice-tone">Bold & Confident</div>
+            </div>
+            <div class="voice-option" data-voice="Kore">
+              <div class="voice-name">Kore</div>
+              <div class="voice-tone">Gentle & Warm</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">System Personality</label>
+          <textarea id="systemPromptInput" class="form-textarea" rows="3">You are My Maya, a friendly, concise, and helpful live voice assistant for an Android app. When the user asks you to manage their to-do list or write notes, call the appropriate tools immediately. Keep spoken answers short and natural.</textarea>
+        </div>
+
+        <button id="saveVoiceSettingsBtn" class="btn-secondary">Update Voice Settings</button>
+      </div>
+
+      <!-- User Memory Section -->
+      <div class="settings-section">
+        <h3>🧠 Personal Memory & Interests</h3>
+        <p class="settings-desc">Write down what My Maya should remember about you (e.g., your name, interests, style preferences). This context is injected into live conversations.</p>
+        
+        <div class="form-group">
+          <label class="form-label">My Maya's Memory of You</label>
+          <textarea id="userMemoryInput" class="form-textarea" rows="4" placeholder="Example: My name is Nazmul. I love python programming. Please keep your voice answers concise."></textarea>
+        </div>
+
+        <button id="saveMemoryBtn" class="btn-primary">Save Memory</button>
+      </div>
+
+      <!-- Data Backup & Reset -->
+      <div class="settings-section">
+        <h3>💾 Data & Backup</h3>
+        <p class="settings-desc">Export or import your tasks and notes.</p>
+        <button id="exportDataBtn" class="btn-secondary">📥 Export All Data (JSON)</button>
+        <button id="importDataBtn" class="btn-secondary">📤 Import Data</button>
+        <input type="file" id="importFileInput" accept=".json" style="display: none;">
+        <button id="clearAllDataBtn" class="btn-danger">🗑️ Reset All App Data</button>
+      </div>
+
+      <!-- Android Installation Info -->
+      <div class="settings-section">
+        <h3>📱 Android App Installation</h3>
+        <p class="settings-desc">
+          To install this on your Android device:
+          <br>1. Open this page in <b>Google Chrome</b> on your phone.
+          <br>2. Tap the <b>⋮ Menu</b> (top right).
+          <br>3. Tap <b>"Add to Home screen"</b> or <b>"Install app"</b>.
+        </p>
+        <button id="installPwaBtn" class="btn-primary" style="display: none;">Install to Android</button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Floating Action Button for Manual Task Addition (Visible on To-Do Tab) -->
+  <button id="fabAddTask" class="fab-btn" title="Add Task Manually" style="display: none;">+</button>
+
+  <!-- ================= Bottom Navigation Bar ================= -->
+  <nav class="bottom-nav">
+    <div class="nav-item active" data-target="view-live">
+      <span class="nav-icon">⚡</span>
+      <span class="nav-label">Live</span>
+    </div>
+    <div class="nav-item" data-target="view-todo">
+      <span class="nav-icon">📝</span>
+      <span class="nav-label">Tasks</span>
+    </div>
+    <div class="nav-item" data-target="view-notes">
+      <span class="nav-icon">💡</span>
+      <span class="nav-label">Notes</span>
+    </div>
+    <div class="nav-item" data-target="view-chat">
+      <span class="nav-icon">💬</span>
+      <span class="nav-label">Chat</span>
+    </div>
+    <div class="nav-item" data-target="view-settings">
+      <span class="nav-icon">⚙️</span>
+      <span class="nav-label">Settings</span>
+    </div>
+  </nav>
+
+</div>
+
+<!-- ================= MODALS ================= -->
+
+<!-- 1. Task Modal (Add & Edit) -->
+<div id="taskModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 id="taskModalTitle" class="modal-title">New Task</h3>
+      <button class="modal-close-btn" id="closeTaskModal">&times;</button>
+    </div>
+
+    <form id="taskForm">
+      <input type="hidden" id="taskIdInput">
+
+      <div class="form-group">
+        <label class="form-label">Task Title *</label>
+        <div class="input-with-action">
+          <input type="text" id="taskTitleInput" class="form-input" placeholder="What needs to be done?" required>
+          <button type="button" class="dictate-btn" id="dictateTaskTitle" title="Dictate Title">🎙️</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Description (Optional)</label>
+        <div class="input-with-action">
+          <textarea id="taskDescInput" class="form-textarea" rows="2" placeholder="Additional details..."></textarea>
+          <button type="button" class="dictate-btn" id="dictateTaskDesc" title="Dictate Description">🎙️</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <select id="taskCategorySelect" class="form-select">
+          <option value="Personal">Personal</option>
+          <option value="Work">Work</option>
+          <option value="Shopping">Shopping</option>
+          <option value="Urgent">Urgent</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Priority</label>
+        <div class="priority-selector" id="prioritySelector">
+          <button type="button" class="prio-btn low" data-prio="low">Low</button>
+          <button type="button" class="prio-btn medium selected" data-prio="medium">Medium</button>
+          <button type="button" class="prio-btn high" data-prio="high">High</button>
+          <button type="button" class="prio-btn urgent" data-prio="urgent">Urgent</button>
+        </div>
+        <input type="hidden" id="taskPriorityInput" value="medium">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Due Date</label>
+        <input type="date" id="taskDueDateInput" class="form-input">
+      </div>
+
+      <button type="submit" class="btn-primary" id="saveTaskSubmitBtn">Save Task</button>
+    </form>
+  </div>
+</div>
+
+<!-- 2. Note Modal (Add & Edit) -->
+<div id="noteModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 id="noteModalTitle" class="modal-title">New Note</h3>
+      <button class="modal-close-btn" id="closeNoteModal">&times;</button>
+    </div>
+
+    <form id="noteForm">
+      <input type="hidden" id="noteIdInput">
+
+      <div class="form-group">
+        <label class="form-label">Title</label>
+        <div class="input-with-action">
+          <input type="text" id="noteTitleInput" class="form-input" placeholder="Note Title...">
+          <button type="button" class="dictate-btn" id="dictateNoteTitle" title="Dictate Title">🎙️</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Content *</label>
+        <div class="input-with-action">
+          <textarea id="noteContentInput" class="form-textarea" rows="5" placeholder="Write or dictate note..." required></textarea>
+          <button type="button" class="dictate-btn" id="dictateNoteContent" title="Dictate Content">🎙️</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Tags (comma-separated)</label>
+        <input type="text" id="noteTagsInput" class="form-input" placeholder="Idea, Work, Recipe...">
+      </div>
+
+      <button type="submit" class="btn-primary">Save Note</button>
+    </form>
+  </div>
+</div>
+
+<!-- 3. API Key Modal Prompt -->
+<div id="apiKeyModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 class="modal-title">🔑 Enter Gemini API Key</h3>
+      <button class="modal-close-btn" id="closeApiKeyModal">&times;</button>
+    </div>
+    <p class="settings-desc">To talk live to My Maya, please enter your Google Gemini API key. It is stored securely in your browser.</p>
+    
+    <div class="form-group">
+      <label class="form-label">API Key</label>
+      <input type="password" id="modalApiKeyInput" class="form-input" placeholder="AIzaSy...">
+    </div>
+
+    <button id="modalSaveApiKeyBtn" class="btn-primary">Save & Connect</button>
+    <a href="https://aistudio.google.com/app/apikey" target="_blank" style="display:block; text-align:center; color:var(--accent-cyan); font-size:12px; margin-top:12px; text-decoration:none;">Get a Free Gemini API Key &rarr;</a>
+  </div>
+</div>
+
+<!-- 4. Add/Edit Alarm Modal -->
+<div id="alarmModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 id="alarmModalTitle" class="modal-title">New Alarm</h3>
+      <button class="modal-close-btn" id="closeAlarmModal">&times;</button>
+    </div>
+
+    <form id="alarmForm">
+      <input type="hidden" id="alarmIdInput">
+
+      <div class="form-group">
+        <label class="form-label">Time *</label>
+        <input type="time" id="alarmTimeInput" class="form-input" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Label (Optional)</label>
+        <input type="text" id="alarmLabelInput" class="form-input" placeholder="Wakeup, Meeting...">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Repeat Days</label>
+        <div class="days-selector">
+          <label class="day-btn"><input type="checkbox" value="1"><span>M</span></label>
+          <label class="day-btn"><input type="checkbox" value="2"><span>T</span></label>
+          <label class="day-btn"><input type="checkbox" value="3"><span>W</span></label>
+          <label class="day-btn"><input type="checkbox" value="4"><span>T</span></label>
+          <label class="day-btn"><input type="checkbox" value="5"><span>F</span></label>
+          <label class="day-btn"><input type="checkbox" value="6"><span>S</span></label>
+          <label class="day-btn"><input type="checkbox" value="7"><span>S</span></label>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-primary">Save Alarm</button>
+    </form>
+  </div>
+</div>
+
+<!-- 5. Alarm Ringing Overlay -->
+<div id="alarmRingingModal" class="alarm-ringing-overlay">
+  <div class="ringing-card">
+    <div class="ringing-bell">🔔</div>
+    <div id="ringingTime" class="ringing-time">07:30</div>
+    <div id="ringingLabel" class="ringing-label">Morning Wakeup</div>
+    <div class="ringing-buttons">
+      <button id="dismissAlarmBtn" class="ringing-btn dismiss">Dismiss</button>
+      <button id="snoozeAlarmBtn" class="ringing-btn snooze">Snooze (5m)</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toastContainer" class="toast-container"></div>
+
+<!-- Scripts -->
+<script src="js/todo-store.js"></script>
+<script src="js/gemini-tools.js"></script>
+<script src="js/audio-recorder.js"></script>
+<script src="js/audio-player.js"></script>
+<script src="js/visualizer.js"></script>
+<script src="js/live-client.js"></script>
+<script src="js/app.js"></script>
+
+<script>
+  // Register PWA Service Worker
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js').catch(err => console.log('SW register failed', err));
+    });
+  }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "name": "My Maya Live Voice AI & Smart To-Do",
+  "short_name": "My Maya",
+  "description": "Live conversational AI assistant with Barge-in support, voice-powered To-Do list, and note storage for Android.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#07090e",
+  "theme_color": "#07090e",
+  "categories": ["productivity", "utilities", "lifestyle"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
