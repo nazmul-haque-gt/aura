@@ -1,0 +1,200 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install npm dependencies
+        run: npm install
+
+      - name: Install Capacitor CLI (local)
+        run: npm install @capacitor/core @capacitor/android @capacitor/cli
+
+      - name: Add Android platform (first run only)
+        run: |
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+
+      - name: Add microphone + wake-lock permissions to AndroidManifest.xml
+        run: |
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          if ! grep -q "RECORD_AUDIO" "$MANIFEST"; then
+            sed -i '/<manifest /a \
+              <uses-permission android:name="android.permission.RECORD_AUDIO" />\
+              <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\
+              <uses-permission android:name="android.permission.WAKE_LOCK" />\
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />\
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\
+              <uses-feature android:name="android.hardware.microphone" android:required="false" />' "$MANIFEST"
+          fi
+
+          # Register the foreground service inside <application> and wire it to MainActivity
+          if ! grep -q "VoiceForegroundService" "$MANIFEST"; then
+            sed -i '/<\/application>/i \
+              <service android:name=".VoiceForegroundService" android:foregroundServiceType="microphone" android:exported="false" />' "$MANIFEST"
+          fi
+          cat "$MANIFEST"
+
+      - name: Create VoiceForegroundService.java (keeps mic + audio alive with screen off)
+        run: |
+          PKG_DIR=$(dirname "$(find android/app/src/main/java -name "MainActivity.java")")
+          PKG_NAME=$(grep -m1 "^package" "$PKG_DIR"/MainActivity.java | sed 's/package //; s/;//')
+          cat > "$PKG_DIR/VoiceForegroundService.java" << EOF
+          package ${PKG_NAME};
+
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.app.Service;
+          import android.content.Intent;
+          import android.os.Build;
+          import android.os.IBinder;
+          import android.os.PowerManager;
+          import androidx.core.app.NotificationCompat;
+
+          public class VoiceForegroundService extends Service {
+              private static final String CHANNEL_ID = "aura_voice_channel";
+              private PowerManager.WakeLock wakeLock;
+
+              @Override
+              public void onCreate() {
+                  super.onCreate();
+                  PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+                  wakeLock = pm.newWakeLock(
+                          PowerManager.PARTIAL_WAKE_LOCK, "Aura::VoiceWakeLock");
+                  wakeLock.acquire();
+              }
+
+              @Override
+              public int onStartCommand(Intent intent, int flags, int startId) {
+                  createNotificationChannel();
+                  Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+                          .setContentTitle("Aura is listening")
+                          .setContentText("Live voice session active in background")
+                          .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+                          .setOngoing(true)
+                          .build();
+                  startForeground(1, notification);
+                  return START_STICKY;
+              }
+
+              private void createNotificationChannel() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      NotificationChannel channel = new NotificationChannel(
+                              CHANNEL_ID, "Aura Voice", NotificationManager.IMPORTANCE_LOW);
+                      NotificationManager manager = getSystemService(NotificationManager.class);
+                      manager.createNotificationChannel(channel);
+                  }
+              }
+
+              @Override
+              public void onDestroy() {
+                  super.onDestroy();
+                  if (wakeLock != null && wakeLock.isHeld()) {
+                      wakeLock.release();
+                  }
+              }
+
+              @Override
+              public IBinder onBind(Intent intent) {
+                  return null;
+              }
+          }
+          EOF
+          echo "Created $PKG_DIR/VoiceForegroundService.java"
+
+      - name: Wire MainActivity to start/stop the foreground service
+        run: |
+          MAIN_ACT=$(find android/app/src/main/java -name "MainActivity.java")
+          echo "Patching: $MAIN_ACT"
+          python3 - "$MAIN_ACT" << 'EOF'
+          import sys, re
+          path = sys.argv[1]
+          with open(path) as f:
+              content = f.read()
+
+          if "RECORD_AUDIO" not in content:
+              content = content.replace(
+                  "import com.getcapacitor.BridgeActivity;",
+                  "import com.getcapacitor.BridgeActivity;\n"
+                  "import android.Manifest;\n"
+                  "import android.content.Intent;\n"
+                  "import android.content.pm.PackageManager;\n"
+                  "import androidx.core.app.ActivityCompat;\n"
+                  "import androidx.core.content.ContextCompat;\n"
+                  "import android.os.Build;\n"
+                  "import android.os.Bundle;"
+              )
+              # onCreate: request permissions + start the foreground service that
+              # holds the wake lock, so audio keeps running with the screen off.
+              content = re.sub(
+                  r"(public class MainActivity extends BridgeActivity \{)",
+                  r"\1\n"
+                  r"    @Override\n"
+                  r"    public void onCreate(Bundle savedInstanceState) {\n"
+                  r"        super.onCreate(savedInstanceState);\n"
+                  r"        String[] perms;\n"
+                  r"        if (Build.VERSION.SDK_INT >= 33) {\n"
+                  r"            perms = new String[]{Manifest.permission.RECORD_AUDIO,\n"
+                  r"                    Manifest.permission.POST_NOTIFICATIONS};\n"
+                  r"        } else {\n"
+                  r"            perms = new String[]{Manifest.permission.RECORD_AUDIO};\n"
+                  r"        }\n"
+                  r"        ActivityCompat.requestPermissions(this, perms, 1001);\n"
+                  r"        Intent serviceIntent = new Intent(this, VoiceForegroundService.class);\n"
+                  r"        if (Build.VERSION.SDK_INT >= 26) {\n"
+                  r"            startForegroundService(serviceIntent);\n"
+                  r"        } else {\n"
+                  r"            startService(serviceIntent);\n"
+                  r"        }\n"
+                  r"    }\n\n"
+                  r"    @Override\n"
+                  r"    public void onDestroy() {\n"
+                  r"        stopService(new Intent(this, VoiceForegroundService.class));\n"
+                  r"        super.onDestroy();\n"
+                  r"    }",
+                  content
+              )
+              with open(path, "w") as f:
+                  f.write(content)
+          EOF
+          cat "$MAIN_ACT"
+
+      - name: Sync web assets into Android project
+        run: npx cap sync android
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x android/gradlew
+
+      - name: Build debug APK
+        run: |
+          cd android
+          ./gradlew assembleDebug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aura-app-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
